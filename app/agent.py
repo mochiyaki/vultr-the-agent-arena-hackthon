@@ -49,7 +49,7 @@ TOOLS = [
 
 PLANNER_SYSTEM = """You are the planner of a sandboxed coding agent. The executor can only run shell
 commands and read/write files inside an isolated Linux container (Python 3.12 with numpy, pandas,
-matplotlib, requests-less; Node.js available; NO network access; no sudo; 60s per command).
+matplotlib, requests; Node.js available; NO network access; no sudo; 60s per command).
 
 Break the user's task into 1-{max_steps} concrete, sequential steps. Each step must produce
 observable evidence (command output or a file). The last step should verify the result

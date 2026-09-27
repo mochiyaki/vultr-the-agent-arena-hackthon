@@ -70,7 +70,7 @@ class DockerSandbox(Sandbox):
             pids_limit=p.pids_limit,
             read_only=p.read_only_rootfs,
             tmpfs={
-                WORKSPACE: f"rw,noexec,nosuid,size={p.workspace_mb}m,uid=65534,gid=65534,mode=0700",
+                WORKSPACE: f"rw,nosuid,size={p.workspace_mb}m,uid=65534,gid=65534,mode=0700",
                 "/tmp": "rw,nosuid,size=32m,uid=65534,gid=65534,mode=0700",
             },
             cap_drop=["ALL"] if p.drop_all_capabilities else [],

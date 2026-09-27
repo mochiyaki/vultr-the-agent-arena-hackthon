@@ -10,6 +10,8 @@ import time
 from pathlib import Path
 
 import httpx
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
@@ -24,7 +26,6 @@ from .store import store
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 log = logging.getLogger("brz")
 
-app = FastAPI(title="Blast Radius Zero", version="0.1.0")
 STATIC = Path(__file__).parent / "static"
 _llm = VultrInference()
 _agent = Agent(_llm)
@@ -37,8 +38,8 @@ class TaskIn(BaseModel):
     prompt: str = Field(min_length=3, max_length=4000)
 
 
-@app.on_event("startup")
-async def _startup() -> None:
+@asynccontextmanager
+async def lifespan(_: FastAPI):
     global _vultr_meta
     # Vultr instance metadata service (only reachable from a Vultr VM). Best-effort.
     try:
@@ -52,6 +53,11 @@ async def _startup() -> None:
     except Exception:
         _vultr_meta = {}
     log.info("sandbox driver: %s", json.dumps(describe_driver(), default=str))
+    yield
+    await _llm.aclose()
+
+
+app = FastAPI(title="Blast Radius Zero", version="0.1.0", lifespan=lifespan)
 
 
 @app.get("/")
