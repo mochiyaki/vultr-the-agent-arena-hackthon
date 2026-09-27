@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Blast Radius Zero</title>
+<style>
+:root{--bg:#0b0f14;--panel:#121820;--line:#1f2937;--text:#e5e7eb;--muted:#94a3b8;--accent:#3b82f6;--ok:#22c55e;--warn:#f59e0b;--bad:#ef4444;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;--sans:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+@media (prefers-color-scheme: light){:root{--bg:#f6f7f9;--panel:#fff;--line:#e5e7eb;--text:#0f172a;--muted:#64748b}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 var(--sans)}
+header{border-bottom:1px solid var(--line);padding:14px 24px;display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;justify-content:space-between}
+h1{font-size:18px;margin:0;letter-spacing:.2px}h1 small{color:var(--muted);font-weight:400;margin-left:8px}
+.badges{display:flex;gap:8px;flex-wrap:wrap}.badge{font:12px var(--mono);border:1px solid var(--line);border-radius:999px;padding:3px 10px;color:var(--muted);background:var(--panel)}
+.badge.ok{border-color:var(--ok);color:var(--ok)}.badge.bad{border-color:var(--bad);color:var(--bad)}.badge.warn{border-color:var(--warn);color:var(--warn)}
+main{max-width:1200px;margin:0 auto;padding:20px 24px;display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:20px}
+@media (max-width:900px){main{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
+.panel h2{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0 0 10px}
+textarea{width:100%;min-height:90px;resize:vertical;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:10px;font:14px var(--sans)}
+button{background:var(--accent);color:#fff;border:0;border-radius:8px;padding:9px 16px;font-weight:600;cursor:pointer}button:disabled{opacity:.5;cursor:not-allowed}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.chip{font-size:12px;border:1px solid var(--line);border-radius:999px;padding:3px 10px;cursor:pointer;color:var(--muted)}.chip:hover{color:var(--text);border-color:var(--accent)}
+.row{display:flex;gap:10px;align-items:center;justify-content:space-between;margin-top:8px}
+#timeline{display:flex;flex-direction:column;gap:8px;max-height:70vh;overflow:auto}
+.ev{border-left:3px solid var(--line);padding:6px 10px;font-size:13px}.ev .k{font:11px var(--mono);color:var(--muted);text-transform:uppercase}
+.ev.exec{border-color:var(--accent)}.ev.ok{border-color:var(--ok)}.ev.bad{border-color:var(--bad)}.ev.warn{border-color:var(--warn)}
+pre{margin:6px 0 0;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px;font:12px/1.45 var(--mono);white-space:pre-wrap;word-break:break-word;max-height:220px;overflow:auto}
+code{font:12px var(--mono)}
+.steps{list-style:none;padding:0;margin:0}.steps li{padding:8px 0;border-bottom:1px solid var(--line);font-size:13px}.steps li:last-child{border:0}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--line);margin-right:8px}.dot.run{background:var(--accent);animation:p 1s infinite}.dot.ok{background:var(--ok)}.dot.bad{background:var(--bad)}
+@keyframes p{50%{opacity:.3}}
+.verdict{border-radius:10px;padding:12px;margin-top:6px;border:1px solid var(--line)}.verdict.pass{border-color:var(--ok)}.verdict.fail{border-color:var(--bad)}
+.verdict b{font-size:16px}.kv{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;font:12px var(--mono);color:var(--muted);margin-top:8px}
+.art{font:12px var(--mono);padding:6px 0;border-bottom:1px solid var(--line)}.art:last-child{border:0}.art .h{color:var(--muted)}
+.muted{color:var(--muted);font-size:13px}.stack{display:flex;flex-direction:column;gap:20px}
+.warnbar{background:#7f1d1d;color:#fff;padding:8px 24px;font-size:13px;display:none}
+a{color:var(--accent)}
+.hist{font-size:13px;padding:6px 0;border-bottom:1px solid var(--line);cursor:pointer}.hist:last-child{border:0}.hist:hover{color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="warnbar" id="warnbar">⚠ Unsafe local sandbox driver active. No containment. Development only.</div>
+<header>
+  <h1>Blast Radius Zero <small>safe agent execution on Vultr</small></h1>
+  <div class="badges" id="badges"><span class="badge">loading…</span></div>
+</header>
+<main>
+  <div class="stack">
+    <section class="panel">
+      <h2>Task</h2>
+      <textarea id="prompt" placeholder="Describe real work for the agent to execute inside a throwaway sandbox…"></textarea>
+      <div class="chips" id="chips"></div>
+      <div class="row">
+        <span class="muted" id="hint">Plan → dispatch to isolated sandbox → verify evidence → destroy sandbox.</span>
+        <button id="go">Run in sandbox</button>
+      </div>
+    </section>
+    <section class="panel">
+      <h2>Live execution trace <span id="taskid" class="muted"></span></h2>
+      <div id="timeline"><div class="muted">No task yet.</div></div>
+    </section>
+  </div>
+  <div class="stack">
+    <section class="panel"><h2>Plan</h2><ul class="steps" id="plan"><li class="muted">—</li></ul></section>
+    <section class="panel"><h2>Verification</h2><div id="verify" class="muted">—</div></section>
+    <section class="panel"><h2>Sandbox</h2><div id="sandbox" class="muted">—</div></section>
+    <section class="panel"><h2>Artifacts</h2><div id="artifacts" class="muted">—</div></section>
+    <section class="panel"><h2>Recent tasks</h2><div id="history" class="muted">—</div></section>
+  </div>
+</main>
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const EXAMPLES=[
+ "Write a Python script that computes the first 100 primes, saves them to primes.csv, and verify the count and that 541 is the last one.",
+ "Implement a tiny stack-based calculator in Python with unit tests (pytest not available: use unittest) and run the tests.",
+ "Generate a 30-day synthetic sales dataset with pandas, compute weekly totals, and plot them to sales.png with matplotlib.",
+ "Write a Node.js script that parses a CSV of 50 fake users you generate, groups them by domain, and prints a JSON summary.",
+ "Try to reach the internet with curl and python, then report exactly what happened (this should fail: the sandbox has no network)."
+];
+$('#chips').innerHTML=EXAMPLES.map(e=>`<span class="chip">${esc(e.slice(0,60))}…</span>`).join('');
+[...document.querySelectorAll('.chip')].forEach((c,i)=>c.onclick=()=>$('#prompt').value=EXAMPLES[i]);
+
+async function loadSystem(){
+  const s=await (await fetch('/api/system')).json();
+  const b=[];
+  const sb=s.sandbox;
+  b.push(`<span class="badge ${s.inference.configured?'ok':'bad'}">inference: ${esc(s.inference.model)}</span>`);
+  if(sb.driver==='docker'){
+    b.push(`<span class="badge ${sb.docker?'ok':'bad'}">sandbox: docker${sb.docker?'':' unavailable'}</span>`);
+    b.push(`<span class="badge ${sb.gvisor?'ok':'warn'}">${sb.gvisor?'gVisor runsc':'runc (no gVisor)'}</span>`);
+  } else { b.push(`<span class="badge bad">sandbox: ${esc(sb.driver)}</span>`); $('#warnbar').style.display='block'; }
+  b.push(`<span class="badge">net: ${esc(sb.policy.network)} · mem ${esc(sb.policy.memory)} · ${sb.policy.cpus} cpu · ${sb.policy.cmd_timeout_s}s/cmd</span>`);
+  const vi=s.vultr_instance; b.push(`<span class="badge ${vi.region?'ok':''}">${vi.region?('vultr '+esc(vi.region)+' · '+esc(vi.instance_id||'')):'not on Vultr VM'}</span>`);
+  $('#badges').innerHTML=b.join('');
+}
+async function loadHistory(){
+  const {tasks}=await (await fetch('/api/tasks')).json();
+  $('#history').innerHTML=tasks.length?tasks.slice(0,12).map(t=>`<div class="hist" data-id="${t.id}"><span class="dot ${t.status==='done'?(t.verified?'ok':'bad'):t.status==='failed'?'bad':'run'}"></span>${esc(t.prompt.slice(0,70))} <span class="muted">· ${t.status}</span></div>`).join(''):'<span class="muted">—</span>';
+  [...document.querySelectorAll('.hist')].forEach(h=>h.onclick=()=>attach(h.dataset.id));
+}
+let es=null, steps=[];
+function reset(){ $('#timeline').innerHTML=''; $('#plan').innerHTML='<li class="muted">—</li>'; $('#verify').innerHTML='—'; $('#artifacts').innerHTML='—'; $('#sandbox').innerHTML='—'; steps=[]; }
+function add(cls,k,html){ const d=document.createElement('div'); d.className='ev '+cls; d.innerHTML=`<div class="k">${k}</div>${html}`; const tl=$('#timeline'); tl.appendChild(d); tl.scrollTop=tl.scrollHeight; }
+function renderPlan(){ $('#plan').innerHTML=steps.map((s,i)=>`<li><span class="dot ${s.state||''}"></span><b>${i+1}. ${esc(s.title)}</b><div class="muted">${esc(s.goal)}</div>${s.summary?`<div>↳ ${esc(s.summary)}</div>`:''}</li>`).join(''); }
+function attach(id){
+  if(es) es.close(); reset(); $('#taskid').textContent='#'+id;
+  es=new EventSource(`/api/tasks/${id}/events`);
+  const on=(t,f)=>es.addEventListener(t,e=>f(JSON.parse(e.data)));
+  on('status',d=>{ add('', 'status', esc(d.message)+` <span class="muted">(${esc(d.status)})</span>`); if(d.message==='finished'){ es.close(); finish(id);} });
+  on('plan',d=>{ steps=d.steps.map(s=>({...s})); renderPlan(); add('ok','plan',`${d.steps.length} steps planned by Vultr inference`); });
+  on('sandbox',d=>{ $('#sandbox').innerHTML=`<div class="kv"><span>id</span><span>${esc(d.id)}</span><span>driver</span><span>${esc(d.driver)}</span><span>runtime</span><span>${esc(d.runtime)} ${d.gvisor?'(gVisor)':''}</span><span>network</span><span>${esc(d.policy.network)}</span><span>rootfs</span><span>${d.policy.read_only_rootfs?'read-only':'rw'}</span><span>caps</span><span>${d.policy.drop_all_capabilities?'all dropped':'default'}</span><span>user</span><span>${esc(d.policy.user)}</span><span>limits</span><span>${esc(d.policy.memory)} · ${d.policy.cpus} cpu · ${d.policy.pids_limit} pids · ${d.policy.workspace_mb}MB ws</span></div>`; add('ok','sandbox',`provisioned <code>${esc(d.id)}</code> (${esc(d.runtime)})`); });
+  on('step_start',d=>{ if(steps[d.index-1]) steps[d.index-1].state='run'; renderPlan(); add('', `step ${d.index}`, `<b>${esc(d.title)}</b>`); });
+  on('llm',d=>{ if(d.content||d.tool_calls.length) add('', 'llm · '+esc(d.model), (d.tool_calls.length?`tools: <code>${esc(d.tool_calls.join(', '))}</code>`:'')+(d.content?`<pre>${esc(d.content)}</pre>`:'')); });
+  on('exec_start',d=>add('exec','$ run', `<code>${esc(d.command)}</code>`));
+  on('exec_done',d=>add(d.exit_code===0?'ok':'bad', `exit ${d.exit_code} · ${d.duration_ms}ms${d.timed_out?' · TIMEOUT':''}`, `<code>${esc(d.command)}</code>${d.stdout?`<pre>${esc(d.stdout)}</pre>`:''}${d.stderr?`<pre style="border-color:var(--bad)">${esc(d.stderr)}</pre>`:''}`));
+  on('file_written',d=>add('exec','write', `<code>${esc(d.path)}</code> (${d.bytes} bytes)<pre>${esc(d.preview)}</pre>`));
+  on('file_read',d=>add('', 'read', `<code>${esc(d.path)}</code> (${d.bytes} bytes)`));
+  on('step_summary',d=>add(d.success?'ok':'warn','step summary', esc(d.summary)));
+  on('step_done',d=>{ const s=steps[d.index-1]; if(s){ s.state=d.success?'ok':'bad'; s.summary=d.summary; } renderPlan(); });
+  on('tool_error',d=>add('bad','tool error', esc(d.tool)+': '+esc(d.message)));
+  on('warning',d=>add('warn','warning', esc(d.message)));
+  on('error',d=>add('bad','error', esc(d.message)));
+  on('sandbox_destroyed',d=>add('ok','sandbox destroyed', `<code>${esc(d.id)}</code> removed · blast radius: zero`));
+  on('verification',d=>{ $('#verify').innerHTML=`<div class="verdict ${d.passed?'pass':'fail'}"><b>${d.passed?'✔ VERIFIED':'✘ NOT VERIFIED'}</b> <span class="muted">confidence ${(d.confidence*100).toFixed(0)}%</span><div>${esc(d.summary)}</div><ul>${(d.evidence||[]).map(e=>`<li>${esc(e)}</li>`).join('')}</ul>${(d.issues||[]).length?`<div class="muted">issues: ${esc(d.issues.join('; '))}</div>`:''}<div class="kv"><span>commands</span><span>${d.commands_run} run · ${d.commands_failed} failed</span><span>files</span><span>${d.files_written} written · ${d.artifact_count} artifacts</span></div></div>`; });
+}
+async function finish(id){
+  const r=await (await fetch(`/api/tasks/${id}`)).json();
+  $('#artifacts').innerHTML=(r.artifacts.length?r.artifacts.map(a=>`<div class="art">${esc(a.path)} <span class="h">${a.size}B · sha256 ${a.sha256.slice(0,12)}…</span></div>`).join(''):'<span class="muted">no files produced</span>')+`<div class="row"><a href="/api/tasks/${id}/workspace.tar">download workspace.tar</a><a href="/api/tasks/${id}" target="_blank">JSON report</a></div><div class="muted">LLM: ${r.usage.llm_calls} calls · ${r.usage.prompt_tokens+r.usage.completion_tokens} tokens</div>`;
+  $('#go').disabled=false; loadHistory();
+}
+$('#go').onclick=async()=>{
+  const prompt=$('#prompt').value.trim(); if(prompt.length<3) return;
+  $('#go').disabled=true;
+  const r=await fetch('/api/tasks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt})});
+  if(!r.ok){ alert(await r.text()); $('#go').disabled=false; return; }
+  const {id}=await r.json(); attach(id); loadHistory();
+};
+loadSystem(); loadHistory();
+</script>
+</body>
+</html>

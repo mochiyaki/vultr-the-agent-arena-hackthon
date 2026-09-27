@@ -1,0 +1,8 @@
+#cloud-config
+# Paste as "User Data / Cloud-Init" when creating the Vultr instance (Ubuntu 24.04).
+# Set REPO_URL to your public repo. After boot: ssh in, edit /opt/blast-radius-zero/.env, `docker compose up -d`.
+package_update: true
+runcmd:
+  - export REPO_URL="https://github.com/<you>/blast-radius-zero.git"
+  - curl -fsSL "https://raw.githubusercontent.com/<you>/blast-radius-zero/main/deploy/setup-vultr.sh" -o /root/setup-vultr.sh
+  - bash /root/setup-vultr.sh > /var/log/brz-setup.log 2>&1

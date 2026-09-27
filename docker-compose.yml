@@ -1,0 +1,21 @@
+services:
+  control-plane:
+    build: .
+    image: brz-control-plane:latest
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "80:8080"
+    volumes:
+      # The control plane orchestrates sandboxes through the host daemon.
+      # Sandboxes are sibling containers, never children of this process.
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      sandbox-image:
+        condition: service_completed_successfully
+
+  # Builds the sandbox image once so the control plane can launch it by tag.
+  sandbox-image:
+    build: ./sandbox
+    image: brz-sandbox:latest
+    command: ["true"]
